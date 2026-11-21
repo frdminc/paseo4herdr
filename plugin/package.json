@@ -5,11 +5,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/djbclark/paseo4herdr.git",
+    "url": "git+https://github.com/frdminc/paseo4herdr.git",
     "directory": "plugin"
   },
-  "homepage": "https://github.com/djbclark/paseo4herdr#readme",
-  "bugs": "https://github.com/djbclark/paseo4herdr/issues",
+  "homepage": "https://github.com/frdminc/paseo4herdr#readme",
+  "bugs": "https://github.com/frdminc/paseo4herdr/issues",
   "private": true,
   "type": "module",
   "files": [

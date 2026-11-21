@@ -6,7 +6,7 @@ A [Paseo](https://paseo.sh) plugin for chatting with [OMP](https://github.com/ca
 
 The agent keeps running in its Herdr pane. Paseo shows the same conversation on your desktop or phone, and you can type in Paseo or in the terminal. It adds a **Herdr** screen that lists your live agents, an **OMP (Herdr)** provider for importing and starting agents, and Paseo cards for OMP's tool approvals and questions.
 
-> **Alpha.** Expect rough edges. Please [open an issue](https://github.com/djbclark/paseo4herdr/issues) with the output of `paseo plugin logs herdr-harness` when something breaks.
+> **Alpha.** Expect rough edges. Please [open an issue](https://github.com/frdminc/paseo4herdr/issues) with the output of `paseo plugin logs herdr-harness` when something breaks.
 
 ## How it works
 
@@ -61,10 +61,10 @@ Run `omp` once before installing, so OMP's agent directory exists.
 2. Install from GitHub:
 
    ```bash
-   paseo plugin install git:djbclark/paseo4herdr:plugin
+   paseo plugin install git:frdminc/paseo4herdr:plugin
    ```
 
-   You can also paste `git:djbclark/paseo4herdr:plugin` into **Settings → Plugins → Plugin source**.
+   You can also paste `git:frdminc/paseo4herdr:plugin` into **Settings → Plugins → Plugin source**.
 
 3. Restart OMP agents that were already running. The install writes an input companion into OMP's extensions directory, and OMP loads extensions only at startup. Until restarted, those agents are read-only in Paseo. On the **Herdr** screen, **Restart to enable input** restarts an idle agent in place.
 4. Open **Herdr** in Paseo's sidebar and tap an agent.
@@ -116,7 +116,7 @@ Install a working copy with `paseo plugin install /absolute/path/to/plugin`, the
 
 The project was renamed from `paseo-herdr`. The plugin id (`herdr-harness`), the `OMP (Herdr)` provider and saved chats are unchanged. The input companion was renamed, so:
 
-1. Install from `git:djbclark/paseo4herdr:plugin` (see [Install](#install)). If you originally installed from the `paseo-herdr` repository, install from this source rather than relying on `paseo plugin update` to follow the rename.
+1. Install from `git:frdminc/paseo4herdr:plugin` (see [Install](#install)). If you originally installed from the `paseo-herdr` repository, install from this source rather than relying on `paseo plugin update` to follow the rename.
 2. The install step writes `paseo4herdr-input.ts` and removes the old `paseo-herdr-input.ts` from OMP's extensions directory, but only when the file starts with the old marker line (`// paseo-herdr OMP input companion.`). A file you wrote under that name is left alone, with a message. OMP loads every file in that directory, so a leftover old companion would mean two are active.
 3. Restart your OMP agents. OMP loads extensions only at startup.
 4. Check the result. From a clone of this repository, `node plugin/scripts/install-omp-companion.mjs --print-path` prints where the companion belongs; confirm `paseo4herdr-input.ts` is there and `paseo-herdr-input.ts` is gone. On the **Herdr** screen, an agent that loaded the new companion has no "Read-only" line. While the old file is still present, the `OMP (Herdr)` provider status reports "OMP input companion is outdated". See [Verify the install](docs/TROUBLESHOOTING.md#verify-the-install).
@@ -136,7 +136,7 @@ The project was renamed from `paseo-herdr`. The plugin id (`herdr-harness`), the
 | [herdr-plain-line](https://github.com/djbclark/herdr-plain-line) | Local plugin: plain-English popup for tab/workspace rename and create |
 | [herdr-sleeper](https://github.com/djbclark/herdr-sleeper) | Plugin: sleep idle agent panes, wake later |
 | [herdr4paseo](https://github.com/djbclark/herdr4paseo) | Terminal UI to watch/steer a Paseo agent from a pane |
-| [paseo4herdr](https://github.com/djbclark/paseo4herdr) | Paseo plugin mirroring OMP agents that run in Herdr |
+| [paseo4herdr](https://github.com/frdminc/paseo4herdr) | Paseo plugin mirroring OMP agents that run in Herdr |
 
 
 ## License
