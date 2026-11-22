@@ -15,7 +15,7 @@ export interface RowTexts {
   times: string;
   /** The cache fragment alone, so the row can colour it. */
   cache: string | null;
-  /** Blocked with a cooling cache: warning tone, on phones too. */
+  /** Warning tone for the times line: blocked with a cooling cache, or read-only in compact view. */
   alert: boolean;
   speech: string;
 }
@@ -26,9 +26,10 @@ const grouped = (item: FlatAgent, isGrouped: boolean): string => (isGrouped ? []
 const stripAgo = (text: string | null): string | null => (text ? text.replace(/ ago$/, "") : null);
 
 /**
- * The single time fact shown in compact view. A blocked agent whose prompt cache is cooling shows that countdown first so
- * the warning tone matches the text; otherwise last activity, then how long it has been in its state, then session start,
- * then any cache text. Plain terminals and agents with no times return empty string.
+ * The single time fact shown in compact view. A read-only agent (`inputReady === false`) shows `read-only` first in
+ * warning tone; else a blocked agent whose prompt cache is cooling shows that countdown so the warning tone matches
+ * the text; otherwise last activity, then how long it has been in its state, then session start, then any cache text.
+ * Plain terminals and agents with no times return empty string.
  */
 function compactTimeFact(
   agent: FlatAgent["agent"],
@@ -39,6 +40,7 @@ function compactTimeFact(
   cache: string | null,
   narrow: boolean,
 ): string {
+  if (agent.inputReady === false) return "read-only";
   if (isCacheAlert(state, agent.status) && cache) return cache;
   if (active) return `active ${narrow ? stripAgo(active) : active}`;
   if (stateDur) return `${agent.status} ${stateDur}`;
@@ -50,6 +52,7 @@ function compactTimeFact(
 export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { compact: boolean; grouped: boolean; expanded?: boolean }): RowTexts {
   const { agent } = item;
   const expanded = opts.expanded ?? false;
+  const readOnly = agent.inputReady === false;
   const state: CacheState = classifyCache(agent.cache, agent.status, nowMs);
   const speechNow = Math.floor(nowMs / 60_000) * 60_000;
   const cache = cacheText(state, opts.compact);
@@ -59,16 +62,20 @@ export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { 
   const started = agoText(agent.sessionStartedAt, nowMs, false);
   const showCwd = agent.cwd && (!opts.grouped || agent.cwd !== item.workspace.cwd);
   const pane = paneText(agent, item.tabPanes);
+  const cacheAlert = isCacheAlert(state, agent.status);
   let place: string;
   let times: string[];
   if (!expanded) {
+    // On narrow phones, place already starts with the status word; when state duration is the fallback time fact,
+    // keep it in head (like expanded-narrow) instead of repeating the status word on line 3.
+    const inlineStateDur = opts.compact && !readOnly && !(cacheAlert && cache) && !active && Boolean(stateDur);
     if (opts.compact) {
-      const head = agent.plain ? plainState(agent) : statusLabel(agent.status);
+      const head = agent.plain ? plainState(agent) : `${statusLabel(agent.status)}${inlineStateDur ? ` ${stateDur}` : ""}`;
       place = [head, opts.grouped ? null : workspaceText(item.workspace), tabText(item.tab)].filter(Boolean).join(" · ");
     } else {
       place = grouped(item, opts.grouped);
     }
-    const one = compactTimeFact(agent, state, active, stateDur, started, cache, opts.compact);
+    const one = inlineStateDur ? "" : compactTimeFact(agent, state, active, stateDur, started, cache, opts.compact);
     times = one ? [one] : [];
   } else if (opts.compact) {
     const head = agent.plain ? plainState(agent) : `${statusLabel(agent.status)}${stateDur ? ` ${stateDur}` : ""}`;
@@ -90,7 +97,7 @@ export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { 
     pin: pane,
     times: times.join(" · "),
     cache,
-    alert: isCacheAlert(state, agent.status),
+    alert: cacheAlert || (!expanded && readOnly),
     // The screen-reader sentence changes once a minute, not with the second-by-second countdown.
     speech: agentSpeech(item, label, classifyCache(agent.cache, agent.status, speechNow), speechNow),
   };

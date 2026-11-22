@@ -190,7 +190,29 @@ describe("compact vs expanded row view", () => {
     expect(narrow.place).toBe("Blocked · one"); // phone compact drops state duration from place
   });
 
-  it("compact falls back to state duration, then session start, then cache, then empty", () => {
+  it("compact shows a short warning-tone read-only marker when input is unavailable", () => {
+    const ro = item({
+      status: "idle",
+      inputReady: false,
+      lastActivityAt: new Date(NOW - 3 * 60_000).toISOString(),
+      stateChangedAt: new Date(NOW - 12 * 60_000).toISOString(),
+      cache: cache(255),
+    });
+    const wide = rowTexts(ro, "Old OMP", NOW, { compact: false, grouped: true, expanded: false });
+    expect(wide.times).toBe("read-only");
+    expect(wide.alert).toBe(true);
+    const narrow = rowTexts(ro, "Old OMP", NOW, { compact: true, grouped: true, expanded: false });
+    expect(narrow.place).toBe("Idle · one");
+    expect(narrow.times).toBe("read-only");
+    expect(narrow.alert).toBe(true);
+    // Expanded shows the full Read-only notice separately, so times keeps normal facts and alert reflects cache only.
+    const expanded = rowTexts(ro, "Old OMP", NOW, { compact: false, grouped: true, expanded: true });
+    expect(expanded.times).toContain("active 3m ago");
+    expect(expanded.times).not.toContain("read-only");
+    expect(expanded.alert).toBe(false);
+  });
+
+  it("compact falls back to state duration, then session start, then cache, then empty, without repeating status on phones", () => {
     const stateOnly = item({
       status: "working",
       stateChangedAt: new Date(NOW - 7 * 60_000).toISOString(),
@@ -198,6 +220,9 @@ describe("compact vs expanded row view", () => {
       sessionStartedAt: new Date(NOW - 3600_000).toISOString(),
     });
     expect(rowTexts(stateOnly, "x", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("working 7m");
+    const narrowStateOnly = rowTexts(stateOnly, "x", NOW, { compact: true, grouped: true, expanded: false });
+    expect(narrowStateOnly.place).toBe("Working 7m · one");
+    expect(narrowStateOnly.times).toBe("");
 
     const startOnly = item({ status: "idle", sessionStartedAt: new Date(NOW - 3600_000).toISOString() });
     expect(rowTexts(startOnly, "x", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("started 1h ago");

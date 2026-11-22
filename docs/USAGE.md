@@ -22,7 +22,7 @@ The screen shows, top to bottom:
 
 ### Agent rows
 
-The screen defaults to **Compact** view so every pane fits on a short row: its status (a symbol and a word), name and harness, where it is (`api-server › tests`, plus a pane name or `pane 2` when the tab holds several panes), one time fact (a cooling prompt-cache alert if blocked, else last activity, time in state, or session start), and its main button.
+The screen defaults to **Compact** view so every pane fits on a short row: its status badge (symbol and word on wide screens; symbol beside the title with the status word in the place line on phones), name (plus harness on wide screens), where it is (`api-server › tests`, plus a pane name or `pane 2` when the tab holds several panes), one time fact (`read-only` in warning tone when input is unavailable, or a cooling prompt-cache alert if blocked, else last activity, time in state, or session start), and its main button.
 
 Switch to **Expanded** using the **Compact / Expanded** toggle beside **Sort** and **Grouped / Flat** to show all inline times and model, the details block (exact times with their source, folder, raw pane id such as `w2:p1`, raw terminal id, and the attach command with **Copy**), and the secondary actions (**Open in terminal**, **New agent in this pane**, **Restart**, **Archive N duplicate chats**, and **Turn on shell input**). The name is the terminal title with the prompt glyph removed, else the Herdr agent name.
 
@@ -32,23 +32,23 @@ The row above the cards sets the order and density: **Sort** picks the field (He
 
 Status is Herdr's own: **Idle**, **Working**, **Blocked** (waiting for a decision), **Done** or **Unknown**.
 
-A pane with no agent (a plain shell, vim, a build) is listed too. Its state reads **Shell** or the program's name, never an agent status, and it has no times, no cache estimate and no transcript. It sorts after every agent in the status sort. Its row has **Open existing terminal**, which opens a Paseo terminal running `herdr terminal attach`. A shell with shell input off also shows **Turn on shell input** (see [Shell input](#shell-input-is-off-by-default)).
+A pane with no agent (a plain shell, vim, a build) is listed too. Its state reads **Shell** or the program's name, never an agent status, and it has no times, no cache estimate and no transcript. It sorts after every agent in the status sort. Its row has **Open existing terminal**, which opens a Paseo terminal running `herdr terminal attach`. In **Expanded** view, a shell with shell input off also shows **Turn on shell input** (see [Shell input](#shell-input-is-off-by-default)).
 
-Every action is a button in the row; nothing sits behind a menu.
+Actions are buttons in the row; nothing sits behind a per-row menu. **Compact** view shows only the row's single main button; switch to **Expanded** for the secondary actions, details and **Copy**.
 
 | Button | On | What it does |
 |---|---|---|
 | **Open existing agent** | An agent that has a Paseo chat | Opens that chat. When several live chats are bound to one agent, the newest owns the row. |
 | **Open agent** | An agent with no chat yet | Creates a chat attached to the running agent (no new process), loads its earlier conversation, and opens it. Tapping the row's text does the same. |
 | **Open existing terminal** | A pane with no agent | Opens a Paseo terminal named `Herdr: <name>` in the pane's folder, running `herdr terminal attach <terminal id>`. |
-| **Open in terminal** | An agent | Opens a Paseo terminal running `herdr agent attach`. Shown only when the daemon can find `herdr` on its `PATH` and the `herdr` CLI would reach the same socket by session name; a custom socket path that the session name wouldn't reach hides it. |
-| **New agent in this pane** | A shell with no chat, shell input on | Binds a chat to that shell. |
-| **Restart agent** / **Restart to enable input** | A restartable agent | The restart described in [Read-only agents](#read-only-agents-and-restart-to-enable-input). It fails with a message unless the agent is idle or done. |
-| **Archive N duplicate chats** | An agent with extra chats bound to it | Archives them; the row's own chat is kept. |
+| **Open in terminal** | An agent (Expanded only, unless it has no chat action) | Opens a Paseo terminal running `herdr agent attach`. Shown only when the daemon can find `herdr` on its `PATH` and the `herdr` CLI would reach the same socket by session name; a custom socket path that the session name wouldn't reach hides it. |
+| **New agent in this pane** | A shell with no chat, shell input on (Expanded only, unless terminal attach is unavailable) | Binds a chat to that shell. |
+| **Restart agent** / **Restart to enable input** | A restartable agent (Expanded only) | The restart described in [Read-only agents](#read-only-agents-and-restart-to-enable-input). It fails with a message unless the agent is idle or done. |
+| **Archive N duplicate chats** | An agent with extra chats bound to it (Expanded only) | Archives them; the row's own chat is kept. |
 | **Import it instead** | After "Couldn't open a chat" | Opens the folder's workspace; use Paseo's **Import session** there and pick the agent by the name and pane shown in the toast. |
-| **Copy** | Every row | Copies the attach command to run in any terminal on the same computer. |
+| **Copy** | Every row (Expanded only) | Copies the attach command to run in any terminal on the same computer. |
 
-- "No Paseo provider handles this agent kind." means Herdr reports the agent as something other than OMP. Only OMP agents have full support.
+- In **Expanded** view, "No Paseo provider handles this agent kind." means Herdr reports the agent as something other than OMP. Only OMP agents have full support.
 - If creating the chat fails, the row shows "Couldn't open a chat: …".
 
 ## Only Herdr items are listed
@@ -71,7 +71,7 @@ A new pane is a plain shell. Chatting with a plain shell needs the shell setting
 
 Shell input lets a Paseo chat type your messages into a plain shell as commands, so it is off until you turn it on. Turn it on in either of two ways:
 
-- Tap **Turn on shell input** on a shell row or in the new-terminal dialog. It saves the same plugin setting as the next route; the explanation sits next to the button.
+- Tap **Turn on shell input** on a shell row (in **Expanded** view) or in the new-terminal dialog. It saves the same plugin setting as the next route; the explanation sits next to the button.
 - Open **Settings > Plugins > herdr-harness > Allow shell input** and switch it on.
 
 Nothing turns it on for you. Each move of the switch stores a new enable epoch, so chats that opted in earlier stay disarmed; see [Shell input](#shell-input-opt-in-off-by-default) below for the whole model.
@@ -125,11 +125,11 @@ If the plugin can't read approvals from the agent, it falls back to a "Needs app
 
 ## Read-only agents and Restart to enable input
 
-OMP loads extensions only when it starts. An OMP process that started before the input companion was installed has no input endpoint, so Paseo can show its conversation but can't send to it. The Herdr screen marks it:
+OMP loads extensions only when it starts. An OMP process that started before the input companion was installed has no input endpoint, so Paseo can show its conversation but can't send to it. The Herdr screen marks the row **read-only** in warning tone in Compact view, and in **Expanded** view shows:
 
 > Read-only: it started before the input companion was installed.
 
-**Restart to enable input** appears when the agent is idle or done. (While it is working, the row says "Restart is available once it's idle.") The confirmation says exactly what happens: OMP is sent SIGTERM, then started again in the same pane with `--resume` on the same session, and anything typed in its terminal but not sent is lost. The plugin waits up to 5 seconds for OMP to exit and up to 30 seconds for the restarted agent to prove its input works. It never force-kills and never starts twice.
+In **Expanded** view, **Restart to enable input** appears when the agent is idle or done. (While it is working, the row says "Restart is available once it's idle.") The confirmation says exactly what happens: OMP is sent SIGTERM, then started again in the same pane with `--resume` on the same session, and anything typed in its terminal but not sent is lost. The plugin waits up to 5 seconds for OMP to exit and up to 30 seconds for the restarted agent to prove its input works. It never force-kills and never starts twice.
 
 The old chat stays read-only. If the agent had a chat, the plugin opens a fresh one on the same conversation after the restart and archives the old one; archived chats can be restored from Paseo's archive.
 

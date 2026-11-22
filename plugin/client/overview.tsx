@@ -721,6 +721,7 @@ function useView(): [SortView, (next: SortView) => void] {
  */
 function useExpanded(): [boolean, (next: boolean) => void] {
   const settings = useSettings(herdrDensitySettings);
+  const toast = useToast();
   const [local, setLocal] = useState<boolean | null>(null);
   const { status, save, reload } = settings;
   const ready = status === "ready" ? settings : null;
@@ -730,7 +731,16 @@ function useExpanded(): [boolean, (next: boolean) => void] {
   const wanted = useRef<boolean | null>(null);
   const saving = useRef(false);
   const retried = useRef(false);
+  const lastStored = useRef<boolean | null>(null);
   const [saved, setSaved] = useState(0);
+  // If another device updates the host setting while no local save is pending, drop any session-only override.
+  useEffect(() => {
+    if (!ready) return;
+    if (lastStored.current !== null && lastStored.current !== stored && wanted.current === null) {
+      setLocal(null);
+    }
+    lastStored.current = stored;
+  }, [ready !== null, stored]);
   useEffect(() => {
     const next = wanted.current;
     if (next === null || revision === null || saving.current) return;
@@ -740,6 +750,11 @@ function useExpanded(): [boolean, (next: boolean) => void] {
       setLocal(null);
       return;
     }
+    const giveUp = () => {
+      wanted.current = null;
+      retried.current = false;
+      toast.error("Couldn't save the view choice; it applies to this session only");
+    };
     saving.current = true;
     void save({ expanded: next }, revision)
       .then((ok) => {
@@ -748,19 +763,15 @@ function useExpanded(): [boolean, (next: boolean) => void] {
           return;
         }
         if (retried.current) {
-          wanted.current = null;
-          retried.current = false;
+          giveUp();
           return;
         }
         retried.current = true;
         return reload();
       })
-      .catch(() => {
-        wanted.current = null;
-        retried.current = false;
-      })
+      .catch(giveUp)
       .finally(() => { saving.current = false; setSaved((n) => n + 1); });
-  }, [revision, stored, save, reload, local, saved]);
+  }, [revision, stored, save, reload, toast, local, saved]);
   const update = useCallback((next: boolean) => {
     wanted.current = next;
     retried.current = false;

@@ -6,7 +6,7 @@ Each entry gives the message or symptom as the plugin shows it, the cause, and t
 
 | Symptom | Go to |
 |---|---|
-| "Read-only: it started before the input companion was installed." | [Agent is read-only](#agent-is-read-only) |
+| "read-only" (Compact) or "Read-only: it started before the input companion was installed." (Expanded) | [Agent is read-only](#agent-is-read-only) |
 | Provider status mentions the "OMP input companion" | [Companion missing, outdated or foreign](#companion-missing-outdated-or-foreign) |
 | "OMP agent directory not found at …; run omp once first" | [OMP agent directory missing](#omp-agent-directory-missing) |
 | "Herdr unavailable: …", "Herdr is not running at …", "Herdr not running: …" | [Herdr is unavailable](#herdr-is-unavailable) |
@@ -23,12 +23,12 @@ Each entry gives the message or symptom as the plugin shows it, the cause, and t
 
 ## Agent is read-only
 
-**Cause.** OMP loads extensions only at startup. An OMP process that started before the input companion was installed (or before it was updated) has no input endpoint, so Paseo can read its conversation but can't send to it. The Herdr screen shows "Read-only: it started before the input companion was installed." and a chat that tries to validate it freezes with **Input companion unavailable**.
+**Cause.** OMP loads extensions only at startup. An OMP process that started before the input companion was installed (or before it was updated) has no input endpoint, so Paseo can read its conversation but can't send to it. The Herdr screen marks the row "read-only" in Compact view (or "Read-only: it started before the input companion was installed." in Expanded view), and a chat that tries to validate it freezes with **Input companion unavailable**.
 
 **Fix.**
 
 1. Make sure the companion is current ([Verify the install](#verify-the-install)).
-2. On the Herdr screen, wait until the agent is idle, then choose **Restart to enable input**. The agent is restarted in the same pane on the same session.
+2. On the Herdr screen, switch to **Expanded**, wait until the agent is idle, then choose **Restart to enable input**. The agent is restarted in the same pane on the same session.
 3. Or do it by hand: quit OMP in its pane and run `omp --resume <session>` in the same pane. The message shown in the chat contains the exact command.
 
 Paseo never restarts an agent unless you confirm it.
@@ -198,7 +198,7 @@ The chat was created on one Herdr session and the plugin settings now point at a
 1. **Where it belongs.** From a clone, `node plugin/scripts/install-omp-companion.mjs --print-path` prints the path: `$PI_CODING_AGENT_DIR/extensions/paseo4herdr-input.ts`, otherwise `~/.omp/agent/extensions/paseo4herdr-input.ts` (`PI_CONFIG_DIR` replaces `.omp`).
 2. **That it is current.** Rerunning the installer prints `already current: <path>` when the file matches. Or compare checksums: `shasum -a 256 <installed file> plugin/harness-extension/omp.ts` should show the same hash twice.
 3. **That no old companion remains.** `paseo-herdr-input.ts` must not be in the same directory.
-4. **That a running agent loaded it.** The agent's row on the Herdr screen has no "Read-only" line. In a shell, `ls -d "${TMPDIR:-/tmp}"/omp-input-*/sock` lists one socket per OMP process that loaded the companion (`omp-input-<pid>/sock`); the daemon must see the same temporary directory as OMP.
+4. **That a running agent loaded it.** The agent's row on the Herdr screen has no "read-only" marker in Compact view (and no "Read-only" line in Expanded view). In a shell, `ls -d "${TMPDIR:-/tmp}"/omp-input-*/sock` lists one socket per OMP process that loaded the companion (`omp-input-<pid>/sock`); the daemon must see the same temporary directory as OMP.
 5. **That Herdr is ready.** The **Connection** card on the Herdr screen shows "Connected, Herdr x.y.z", and the provider status for `OMP (Herdr)` has no diagnostic.
 
 ## Uninstall
@@ -234,6 +234,6 @@ Start with **Settings → Herdr → Diagnostics → Copy diagnostics** and paste
 4. The **Effective target** (socket, session, auto-start) from the Herdr settings screen.
 5. The output of the installer's `--print-path` and `ls -l` of OMP's extensions directory (it shows which companion files are present).
 6. The provider status text for `OMP (Herdr)`.
-7. The Herdr screen row for the agent, if it concerns one, including any "Read-only" line.
+7. The Herdr screen row for the agent in Expanded view, if it concerns one, including any "read-only" / "Read-only" marker.
 
 Remove anything private (paths, prompts) from logs before posting.
