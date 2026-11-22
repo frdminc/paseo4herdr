@@ -103,6 +103,19 @@ describe("shell opt-in: the flag", () => {
     ]);
   });
 
+  it("a frozen shell gives shell recovery instructions without typing or native-session advice", async () => {
+    const { session, writes, events } = await world({ allowShell: true });
+    session.setAllowShell(false);
+    const before = writes().length;
+    await session.prompt(prompt("frozen", "echo never"));
+    const result = events.find((e) => e.type === "session.prompt_result" && e.clientMessageId === "frozen");
+    expect(result).toMatchObject({ result: { type: "failed", error: {
+      message: "This shell conversation is read-only. Check the pane in the terminal, then open a new shell chat from the Herdr screen with shell input enabled.",
+    } } });
+    expect(writes().length).toBe(before);
+    expect(session.state.outcome).toBe("readonly");
+  });
+
   it("without the flag a shell pane behaves as before: not listed, frozen at open, nothing is ever typed", async () => {
     const { session, listCalls, writes, events } = await world({ allowShell: false });
     expect(session.state.outcome).toBe("readonly");
