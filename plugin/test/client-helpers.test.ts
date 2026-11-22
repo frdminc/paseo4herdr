@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { shellGateEpoch } from "../shared/settings.js";
-import { withShellSwitch, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
+import { herdrDensitySettings, shellGateEpoch } from "../shared/settings.js";
+import { withShellSwitch, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, DEFAULT_EXPANDED, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, normalizeExpanded, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, primaryRowAction, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
 
 describe("withShellSwitch", () => {
   const base = { herdrSession: "s", allowShell: false, allowShellEpoch: 0 };
@@ -270,5 +270,40 @@ describe("shell notice toast", () => {
   it("is three times the default toast length once the dialog is turned off", () => {
     expect(NOTICE_TOAST_MS).toBe(DEFAULT_TOAST_MS * 3);
     expect(NOTICE_TOAST_MS).toBe(6600);
+  });
+});
+
+describe("compact/expanded view helpers and setting", () => {
+  const go = { shellInput: false, canNavigate: true };
+  it("picks one main button for compact view: chat first, else terminal, else new agent in shell", () => {
+    expect(primaryRowAction(rowActions(flat({ paseoAgentId: "chat", canRestart: true }).agent, go))).toBe("openAgent");
+    expect(primaryRowAction(rowActions(flat({ canRestart: true }).agent, go))).toBe("openAgent");
+    expect(primaryRowAction(rowActions(flat({ provider: null }).agent, go))).toBe("openTerminal");
+    expect(primaryRowAction(rowActions(plainPane({ paseoAgentId: "chat" }).agent, go))).toBe("openAgent");
+    expect(primaryRowAction(rowActions(plainPane().agent, go))).toBe("openTerminal");
+    expect(primaryRowAction(rowActions(plainPane().agent, { ...go, shellInput: true }))).toBe("openTerminal");
+    expect(primaryRowAction(rowActions(plainPane({ attach: null }).agent, { ...go, shellInput: true }))).toBe("newAgentHere");
+    expect(primaryRowAction(rowActions(plainPane({ attach: null }).agent, go))).toBeNull();
+    expect(primaryRowAction(rowActions(flat({ paseoAgentId: "chat" }).agent, { ...go, canNavigate: false }))).toBeNull();
+  });
+
+  it("normalizes density setting with compact as the default", () => {
+    expect(DEFAULT_EXPANDED).toBe(false);
+    expect(normalizeExpanded(undefined)).toBe(false);
+    expect(normalizeExpanded(null)).toBe(false);
+    expect(normalizeExpanded({})).toBe(false);
+    expect(normalizeExpanded({ expanded: "yes" })).toBe(false);
+    expect(normalizeExpanded({ expanded: true })).toBe(true);
+    expect(normalizeExpanded({ expanded: false })).toBe(false);
+  });
+
+  it("defines host-scoped herdr-overview-density setting defaulting to compact", () => {
+    expect(herdrDensitySettings.id).toBe("herdr-overview-density");
+    expect(herdrDensitySettings.id).toMatch(/^[a-z][a-z0-9-]*$/);
+    expect(herdrDensitySettings.scope).toBe("host");
+    expect(herdrDensitySettings.version).toBe(1);
+    expect(herdrDensitySettings.schema.parse({})).toEqual({ expanded: false });
+    expect(herdrDensitySettings.schema.parse({ expanded: true })).toEqual({ expanded: true });
+    expect(() => herdrDensitySettings.schema.parse({ expanded: "true" })).toThrow();
   });
 });

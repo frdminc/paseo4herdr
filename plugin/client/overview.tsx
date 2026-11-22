@@ -18,11 +18,13 @@ import {
   archiveDuplicatesLabel,
   archiveFailureMessage,
   companionBanner,
+  DEFAULT_EXPANDED,
   describeTarget,
   duplicateArchiveSkippedMessage,
   duplicateChatsToArchive,
   errorMessage,
   freshDuplicatesToArchive,
+  normalizeExpanded,
   OVERVIEW_QUERY_KEY,
   OVERVIEW_REFETCH_MS,
   NOTICE_TOAST_MS,
@@ -31,6 +33,7 @@ import {
   pickerPlace,
   plainState,
   plainRowTitle,
+  primaryRowAction,
   rowActions,
   SHELL_INPUT_EXPLANATION,
   SHELL_INPUT_SETTINGS_PATH,
@@ -43,7 +46,7 @@ import {
   type PickerKind,
 } from "./helpers.js";
 import { agentPlace } from "../shared/labels.js";
-import { herdrNoticeSettings, herdrSettings, herdrViewSettings } from "../shared/settings.js";
+import { herdrDensitySettings, herdrNoticeSettings, herdrSettings, herdrViewSettings } from "../shared/settings.js";
 import {
   DEFAULT_VIEW,
   SORT_FIELD_IDS,
@@ -135,7 +138,8 @@ function useStyles(theme: Theme, compact: boolean) {
       warning: { color: c.statusWarning },
       agent: { gap: 6, paddingVertical: 6, borderTopColor: c.border, borderTopWidth: 1 },
       agentLine: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 },
-      agentMain: { flex: 1, gap: 2 },
+      agentMain: { flex: 1, minWidth: 0, gap: 2 },
+      agentAction: { flexShrink: 0 },
       chip: {
         backgroundColor: c.surface2,
         borderColor: c.border,
@@ -275,7 +279,7 @@ function ShellInputAction({ shell, styles }: { shell: ShellControl; styles: Styl
   );
 }
 
-/** The agent's facts, always visible in its row: exact times with their source, model, folder and the raw pane and terminal ids. */
+/** The agent's facts, shown in expanded view: exact times with their source, model, folder and the raw pane and terminal ids. */
 function RowDetails({ lines, attachCommand, compact, styles }: { lines: DetailLine[]; attachCommand: string; compact: boolean; styles: Styles }) {
   const toast = useToast();
   const copy = useCallback(async () => {
@@ -335,12 +339,13 @@ function useOpenAgent(navigation: Navigation, onChanged: () => void) {
 }
 
 /**
- * One live Herdr pane: an agent or a plain terminal. Every action it has is a button in the row, nothing sits behind a menu.
- * Tapping the text of an agent row opens its chat. Memoised: the screen's clock tick re-renders every row, and a row repaints
- * only when the text it shows changed (`place`, `times`, `alert`, `speech` are plain values).
+ * One live Herdr pane: an agent or a plain terminal. Compact view (the default) keeps each row short: status badge, names,
+ * one time fact and the main button. Expanded view adds all facts, raw ids, the attach command, secondary buttons, restart
+ * and duplicate archiving. Tapping the text of an agent row opens its chat. Memoised: the screen's clock tick re-renders
+ * every row, and a row repaints only when the text it shows changed (`place`, `times`, `alert`, `speech` are plain values).
  */
-const AgentRow = memo(function AgentRow({ item, place: placeLine, pin, times, alert, speech, compact, shellInput, shell, theme, styles, navigation, onChanged }: {
-  item: FlatAgent; place: string; pin: string; times: string; alert: boolean; speech: string; compact: boolean; shellInput: boolean;
+const AgentRow = memo(function AgentRow({ item, place: placeLine, pin, times, alert, speech, compact, expanded, shellInput, shell, theme, styles, navigation, onChanged }: {
+  item: FlatAgent; place: string; pin: string; times: string; alert: boolean; speech: string; compact: boolean; expanded: boolean; shellInput: boolean;
   shell: ShellControl; theme: Theme; styles: Styles; navigation: Navigation; onChanged(): void;
 }) {
   const { agent } = item;
@@ -356,8 +361,8 @@ const AgentRow = memo(function AgentRow({ item, place: placeLine, pin, times, al
   const ready = useRpc(herdrChatReadyRpc);
   const { link, open } = useOpenAgent(navigation, onChanged);
   const terminal = useOpenTerminal(navigation);
-  // Built from the clock at render: the facts and their absolute times don't tick.
-  const details = useMemo(() => detailLines(item, Date.now()), [item]);
+  // Built from the clock when expanded: the facts and their absolute times don't tick.
+  const details = useMemo(() => (expanded ? detailLines(item, Date.now()) : []), [expanded, item]);
   // Fallback if binding fails: Paseo's own Import session lists this agent under the same name.
   const folder = useMutation({
     mutationFn: async () => {
@@ -407,56 +412,81 @@ const AgentRow = memo(function AgentRow({ item, place: placeLine, pin, times, al
     onError: (error) => toast.error(`Couldn't check the chats before archiving: ${errorMessage(error)}`),
   });
   const actions = rowActions(agent, { shellInput, canNavigate: Boolean(navigation) });
+  const primary = primaryRowAction(actions);
   const plainTitle = agent.plain ? plainRowTitle(agent, label) : null;
   const titleName = plainTitle ? plainTitle.name : label;
   const openLabel = link.isPending ? "Opening…" : actions.openAgent === "bind" ? "Open agent" : agent.plain ? "Open chat" : "Open existing agent";
   const terminalLabel = terminal.isPending ? "Opening…" : agent.plain ? "Open existing terminal" : "Open in terminal";
   const newHereLabel = link.isPending ? "Starting…" : "New agent in this pane";
   const restartLabel = readOnly ? "Restart to enable input" : "Restart agent";
+  const mainContent = (
+    <Pressable
+      accessibilityRole={actions.openAgent ? "button" : "text"}
+      accessibilityLabel={actions.openAgent ? `Open chat: ${speech}` : speech}
+      disabled={!actions.openAgent || busy}
+      onPress={() => open(agent, label)}
+      style={styles.agentMain}
+    >
+      <View style={styles.row}>
+        <StatusBadge agent={agent} compact={compact && titleName !== null} theme={theme} plainText={plainTitle?.state} />
+        {titleName !== null ? <Text style={styles.text} numberOfLines={1}>{titleName}</Text> : null}
+        {agent.harness && !compact ? <Text style={styles.muted}>{agent.harness}</Text> : null}
+      </View>
+      {/* react-native-web turns middle truncation into end truncation, so the pane number sits outside the shortened text. */}
+      <View style={styles.placeLine}>
+        <Text style={[styles.muted, styles.placeText]} numberOfLines={1}>{placeLine}</Text>
+        {pin ? <Text style={[styles.muted, styles.placePin]} numberOfLines={1}>{`${compact ? "·" : "›"} ${pin}`}</Text> : null}
+      </View>
+      {times ? <Text style={alert ? styles.warning : styles.muted}>{times}</Text> : null}
+      {expanded && !agent.plain && !agent.provider ? <Text style={styles.muted}>No Paseo provider handles this agent kind.</Text> : null}
+      {expanded && !agent.plain && agent.provider && !paseoAgentId ? (
+        <Text style={styles.muted}>{link.isPending ? "Opening a chat…" : "No chat yet: Open agent attaches one to the running process."}</Text>
+      ) : null}
+      {expanded && agent.plain && !paseoAgentId ? <Text style={styles.muted}>No agent detected in this terminal.</Text> : null}
+    </Pressable>
+  );
+  const mainButton =
+    primary === "openAgent" ? <Button label={openLabel} secondary disabled={busy} onPress={() => open(agent, label)} styles={styles} />
+    : primary === "openTerminal" ? <Button label={terminalLabel} secondary disabled={busy} onPress={() => terminal.mutate({ agent, label })} styles={styles} />
+    : primary === "newAgentHere" ? <Button label={newHereLabel} secondary disabled={busy} onPress={() => link.mutate({ agent, label })} styles={styles} />
+    : null;
   return (
     <View style={styles.agent}>
-      <Pressable
-        accessibilityRole={actions.openAgent ? "button" : "text"}
-        accessibilityLabel={actions.openAgent ? `Open chat: ${speech}` : speech}
-        disabled={!actions.openAgent || busy}
-        onPress={() => open(agent, label)}
-        style={styles.agentMain}
-      >
-        <View style={styles.row}>
-          <StatusBadge agent={agent} compact={compact && titleName !== null} theme={theme} plainText={plainTitle?.state} />
-          {titleName !== null ? <Text style={styles.text} numberOfLines={1}>{titleName}</Text> : null}
-          {agent.harness && !compact ? <Text style={styles.muted}>{agent.harness}</Text> : null}
-        </View>
-        {/* react-native-web turns middle truncation into end truncation, so the pane number sits outside the shortened text. */}
-        <View style={styles.placeLine}>
-          <Text style={[styles.muted, styles.placeText]} numberOfLines={1}>{placeLine}</Text>
-          {pin ? <Text style={[styles.muted, styles.placePin]} numberOfLines={1}>{`${compact ? "·" : "›"} ${pin}`}</Text> : null}
-        </View>
-        {times ? <Text style={alert ? styles.warning : styles.muted}>{times}</Text> : null}
-        {!agent.plain && !agent.provider ? <Text style={styles.muted}>No Paseo provider handles this agent kind.</Text> : null}
-        {!agent.plain && agent.provider && !paseoAgentId ? (
-          <Text style={styles.muted}>{link.isPending ? "Opening a chat…" : "No chat yet: Open agent attaches one to the running process."}</Text>
-        ) : null}
-        {agent.plain && !paseoAgentId ? <Text style={styles.muted}>No agent detected in this terminal.</Text> : null}
-      </Pressable>
-      <RowDetails lines={details} attachCommand={agent.attachCommand} compact={compact} styles={styles} />
-      <View style={styles.row}>
-        {actions.openAgent ? <Button label={openLabel} secondary disabled={busy} onPress={() => open(agent, label)} styles={styles} /> : null}
-        {actions.openTerminal ? <Button label={terminalLabel} secondary disabled={busy} onPress={() => terminal.mutate({ agent, label })} styles={styles} /> : null}
-        {actions.newAgentHere ? <Button label={newHereLabel} secondary disabled={busy} onPress={() => link.mutate({ agent, label })} styles={styles} /> : null}
-        {actions.restart && (!readOnly || idle) ? <Button label={restartLabel} secondary={!readOnly} onPress={() => setRestarting(true)} styles={styles} /> : null}
-        {duplicates.length > 0 ? (
-          <Button label={archiveDuplicatesLabel(duplicates.length)} secondary disabled={archiveDuplicates.isPending} onPress={() => archiveDuplicates.mutate()} styles={styles} />
-        ) : null}
-      </View>
-      {readOnly ? (
-        <View style={styles.row}>
-          <Text style={styles.warning}>Read-only: it started before the input companion was installed.</Text>
-          {agent.canRestart && !idle ? <Text style={styles.muted}>Restart is available once it's idle.</Text> : null}
-        </View>
-      ) : null}
-      {duplicates.length > 0 ? <Text style={styles.muted}>More than one chat is bound to this agent.</Text> : null}
-      {actions.turnOnShell ? <ShellInputAction shell={shell} styles={styles} /> : null}
+      {!expanded ? (
+        compact ? (
+          <>
+            {mainContent}
+            {mainButton ? <View style={styles.row}>{mainButton}</View> : null}
+          </>
+        ) : (
+          <View style={styles.agentLine}>
+            {mainContent}
+            {mainButton ? <View style={styles.agentAction}>{mainButton}</View> : null}
+          </View>
+        )
+      ) : (
+        <>
+          {mainContent}
+          <RowDetails lines={details} attachCommand={agent.attachCommand} compact={compact} styles={styles} />
+          <View style={styles.row}>
+            {actions.openAgent ? <Button label={openLabel} secondary disabled={busy} onPress={() => open(agent, label)} styles={styles} /> : null}
+            {actions.openTerminal ? <Button label={terminalLabel} secondary disabled={busy} onPress={() => terminal.mutate({ agent, label })} styles={styles} /> : null}
+            {actions.newAgentHere ? <Button label={newHereLabel} secondary disabled={busy} onPress={() => link.mutate({ agent, label })} styles={styles} /> : null}
+            {actions.restart && (!readOnly || idle) ? <Button label={restartLabel} secondary={!readOnly} onPress={() => setRestarting(true)} styles={styles} /> : null}
+            {duplicates.length > 0 ? (
+              <Button label={archiveDuplicatesLabel(duplicates.length)} secondary disabled={archiveDuplicates.isPending} onPress={() => archiveDuplicates.mutate()} styles={styles} />
+            ) : null}
+          </View>
+          {readOnly ? (
+            <View style={styles.row}>
+              <Text style={styles.warning}>Read-only: it started before the input companion was installed.</Text>
+              {agent.canRestart && !idle ? <Text style={styles.muted}>Restart is available once it's idle.</Text> : null}
+            </View>
+          ) : null}
+          {duplicates.length > 0 ? <Text style={styles.muted}>More than one chat is bound to this agent.</Text> : null}
+          {actions.turnOnShell ? <ShellInputAction shell={shell} styles={styles} /> : null}
+        </>
+      )}
       {link.error ? (
         <View style={styles.row}>
           <Text accessibilityRole="alert" style={styles.danger}>Couldn't open a chat: {errorMessage(link.error)}</Text>
@@ -465,7 +495,9 @@ const AgentRow = memo(function AgentRow({ item, place: placeLine, pin, times, al
       ) : null}
       {folder.error ? <Text accessibilityRole="alert" style={styles.danger}>{errorMessage(folder.error)}</Text> : null}
       {terminal.error ? <Text accessibilityRole="alert" style={styles.danger}>{errorMessage(terminal.error)}</Text> : null}
-      <RestartSheet agent={agent} label={label} open={restarting} onOpenChange={setRestarting} onRestarted={restarted} styles={styles} />
+      {expanded || restarting ? (
+        <RestartSheet agent={agent} label={label} open={restarting} onOpenChange={setRestarting} onRestarted={restarted} styles={styles} />
+      ) : null}
     </View>
   );
 });
@@ -551,6 +583,7 @@ function WorkspaceCard({
   group,
   grouped,
   compact,
+  expanded,
   nowMs,
   shellInput,
   shell,
@@ -563,6 +596,7 @@ function WorkspaceCard({
   group: { workspace: AgentGroup["workspace"] | null; agents: FlatAgent[] };
   grouped: boolean;
   compact: boolean;
+  expanded: boolean;
   nowMs: number;
   shellInput: boolean;
   shell: ShellControl;
@@ -579,7 +613,7 @@ function WorkspaceCard({
       {workspace?.cwd ? <Text selectable style={styles.muted} numberOfLines={1}>{workspace.cwd}</Text> : null}
       {agents.length === 0 ? <Text style={styles.muted}>No terminals in this workspace.</Text> : null}
       {agents.map((item) => {
-        const texts = rowTexts(item, agentLabel(item.agent), nowMs, { compact, grouped });
+        const texts = rowTexts(item, agentLabel(item.agent), nowMs, { compact, grouped, expanded });
         return (
           <AgentRow
             key={item.agent.terminalId}
@@ -590,6 +624,7 @@ function WorkspaceCard({
             alert={texts.alert}
             speech={texts.speech}
             compact={compact}
+            expanded={expanded}
             shellInput={shellInput}
             shell={shell}
             theme={theme}
@@ -675,6 +710,60 @@ function useView(): [SortView, (next: SortView) => void] {
   }, [revision, stored, save, reload, local, saved]);
   const update = useCallback((next: SortView) => {
     wanted.current = next;
+    setLocal(next);
+  }, []);
+  return [local ?? stored, update];
+}
+
+/**
+ * Compact (default) vs expanded row density, kept in the plugin's host-scoped density setting when it can be read and
+ * written, else in memory for this session. Serialises saves against the setting's revision, like {@link useView}.
+ */
+function useExpanded(): [boolean, (next: boolean) => void] {
+  const settings = useSettings(herdrDensitySettings);
+  const [local, setLocal] = useState<boolean | null>(null);
+  const { status, save, reload } = settings;
+  const ready = status === "ready" ? settings : null;
+  const revision = ready ? ready.revision : null;
+  const rawExpanded = ready?.values.expanded;
+  const stored = ready ? normalizeExpanded({ expanded: rawExpanded }) : DEFAULT_EXPANDED;
+  const wanted = useRef<boolean | null>(null);
+  const saving = useRef(false);
+  const retried = useRef(false);
+  const [saved, setSaved] = useState(0);
+  useEffect(() => {
+    const next = wanted.current;
+    if (next === null || revision === null || saving.current) return;
+    if (next === stored) {
+      wanted.current = null;
+      retried.current = false;
+      setLocal(null);
+      return;
+    }
+    saving.current = true;
+    void save({ expanded: next }, revision)
+      .then((ok) => {
+        if (ok) {
+          retried.current = false;
+          return;
+        }
+        if (retried.current) {
+          wanted.current = null;
+          retried.current = false;
+          return;
+        }
+        retried.current = true;
+        return reload();
+      })
+      .catch(() => {
+        wanted.current = null;
+        retried.current = false;
+      })
+      .finally(() => { saving.current = false; setSaved((n) => n + 1); });
+  }, [revision, stored, save, reload, local, saved]);
+  const update = useCallback((next: boolean) => {
+    wanted.current = next;
+    retried.current = false;
     setLocal(next);
   }, []);
   return [local ?? stored, update];
@@ -814,7 +903,9 @@ function SortPicker({ view, open, onOpenChange, onChange, styles }: {
   );
 }
 
-function SortBar({ view, onChange, compact, styles }: { view: SortView; onChange(next: SortView): void; compact: boolean; styles: Styles }) {
+function SortBar({ view, onChange, expanded, onToggleExpanded, compact, styles }: {
+  view: SortView; onChange(next: SortView): void; expanded: boolean; onToggleExpanded(): void; compact: boolean; styles: Styles;
+}) {
   const [picking, setPicking] = useState(false);
   const arrow = view.dir === "asc" ? "↑" : "↓";
   const label = dirLabel(view.field, view.dir);
@@ -833,6 +924,15 @@ function SortBar({ view, onChange, compact, styles }: { view: SortView; onChange
         style={view.grouped ? styles.chipOn : styles.chip}
       >
         <Text style={styles.text}>{view.grouped ? "Grouped" : "Flat"}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={expanded ? "Expanded view. Tap for compact view" : "Compact view. Tap for expanded view"}
+        onPress={onToggleExpanded}
+        style={expanded ? styles.chipOn : styles.chip}
+      >
+        <Text style={styles.text}>{expanded ? "Expanded" : "Compact"}</Text>
       </Pressable>
       <SortPicker view={view} open={picking} onOpenChange={setPicking} onChange={onChange} styles={styles} />
     </View>
@@ -932,6 +1032,8 @@ export function HerdrOverviewScreen({ theme, layout, navigation }: PluginScreenP
   }, [queryClient]);
   const data = query.data;
   const [view, setView] = useView();
+  const [expanded, setExpanded] = useExpanded();
+  const toggleExpanded = useCallback(() => setExpanded(!expanded), [expanded, setExpanded]);
   const [picking, setPicking] = useState<PickerKind | null>(null);
   const closePicker = useCallback((next: boolean) => { if (!next) setPicking(null); }, []);
   const toast = useToast();
@@ -980,7 +1082,9 @@ export function HerdrOverviewScreen({ theme, layout, navigation }: PluginScreenP
         <HerdrPicker kind="terminal" items={paneItems} open={picking === "terminal"} onOpenChange={closePicker} navigation={navigation} onChanged={refresh} theme={theme} styles={styles} />
       ) : null}
       <ShellNoticeModal note={notice} onClose={closeNotice} onNever={neverNotice} shell={shell} styles={styles} />
-      {data && data.connection.status === "connected" ? <SortBar view={view} onChange={setView} compact={layout.compact} styles={styles} /> : null}
+      {data && data.connection.status === "connected" ? (
+        <SortBar view={view} onChange={setView} expanded={expanded} onToggleExpanded={toggleExpanded} compact={layout.compact} styles={styles} />
+      ) : null}
       {query.error ? (
         <Text accessibilityRole="alert" style={styles.danger}>
           {errorMessage(query.error)}
@@ -1007,6 +1111,7 @@ export function HerdrOverviewScreen({ theme, layout, navigation }: PluginScreenP
               group={group}
               grouped={view.grouped}
               compact={layout.compact}
+              expanded={expanded}
               nowMs={nowMs}
               shellInput={data.shellInput}
               shell={shell}

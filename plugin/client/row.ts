@@ -25,8 +25,31 @@ const grouped = (item: FlatAgent, isGrouped: boolean): string => (isGrouped ? []
 
 const stripAgo = (text: string | null): string | null => (text ? text.replace(/ ago$/, "") : null);
 
-export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { compact: boolean; grouped: boolean }): RowTexts {
+/**
+ * The single time fact shown in compact view. A blocked agent whose prompt cache is cooling shows that countdown first so
+ * the warning tone matches the text; otherwise last activity, then how long it has been in its state, then session start,
+ * then any cache text. Plain terminals and agents with no times return empty string.
+ */
+function compactTimeFact(
+  agent: FlatAgent["agent"],
+  state: CacheState,
+  active: string | null,
+  stateDur: string | null,
+  started: string | null,
+  cache: string | null,
+  narrow: boolean,
+): string {
+  if (isCacheAlert(state, agent.status) && cache) return cache;
+  if (active) return `active ${narrow ? stripAgo(active) : active}`;
+  if (stateDur) return `${agent.status} ${stateDur}`;
+  if (started) return `started ${narrow ? stripAgo(started) : started}`;
+  if (cache) return cache;
+  return "";
+}
+
+export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { compact: boolean; grouped: boolean; expanded?: boolean }): RowTexts {
   const { agent } = item;
+  const expanded = opts.expanded ?? false;
   const state: CacheState = classifyCache(agent.cache, agent.status, nowMs);
   const speechNow = Math.floor(nowMs / 60_000) * 60_000;
   const cache = cacheText(state, opts.compact);
@@ -38,7 +61,16 @@ export function rowTexts(item: FlatAgent, label: string, nowMs: number, opts: { 
   const pane = paneText(agent, item.tabPanes);
   let place: string;
   let times: string[];
-  if (opts.compact) {
+  if (!expanded) {
+    if (opts.compact) {
+      const head = agent.plain ? plainState(agent) : statusLabel(agent.status);
+      place = [head, opts.grouped ? null : workspaceText(item.workspace), tabText(item.tab)].filter(Boolean).join(" · ");
+    } else {
+      place = grouped(item, opts.grouped);
+    }
+    const one = compactTimeFact(agent, state, active, stateDur, started, cache, opts.compact);
+    times = one ? [one] : [];
+  } else if (opts.compact) {
     const head = agent.plain ? plainState(agent) : `${statusLabel(agent.status)}${stateDur ? ` ${stateDur}` : ""}`;
     place = [head, opts.grouped ? null : workspaceText(item.workspace), tabText(item.tab)].filter(Boolean).join(" · ");
     times = [active ? `active ${stripAgo(active)}` : null, cache].filter((part): part is string => Boolean(part));

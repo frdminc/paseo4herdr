@@ -246,6 +246,28 @@ export function rowActions(
   };
 }
 
+/** Compact view is the default for the Herdr overview screen. */
+export const DEFAULT_EXPANDED = false;
+
+/** Normalizes a stored or partial density setting, falling back to compact (`false`). */
+export function normalizeExpanded(raw: { expanded?: unknown } | null | undefined): boolean {
+  return typeof raw?.expanded === "boolean" ? raw.expanded : DEFAULT_EXPANDED;
+}
+
+/** Which single action button compact view shows for a row, or null when none applies. */
+export type PrimaryRowAction = "openAgent" | "openTerminal" | "newAgentHere" | null;
+
+/**
+ * The one main button shown in compact view: open or bind the agent's chat first, else open the pane as a terminal,
+ * else start a new agent in the shell pane. Restart, duplicate archiving and secondary buttons appear in expanded view.
+ */
+export function primaryRowAction(actions: RowActions): PrimaryRowAction {
+  if (actions.openAgent) return "openAgent";
+  if (actions.openTerminal) return "openTerminal";
+  if (actions.newAgentHere) return "newAgentHere";
+  return null;
+}
+
 /** The value a picked suggestion puts in the field: the path plus "/" so the user can keep drilling down. */
 export function folderFieldValue(path: string): string {
   return path.endsWith("/") ? path : `${path}/`;

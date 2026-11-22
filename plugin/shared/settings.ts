@@ -69,3 +69,17 @@ export const herdrViewSettings = defineSettings({
     grouped: z.boolean().default(true),
   }),
 });
+
+/**
+ * Whether Herdr overview rows show the compact summary (default: status badge, names, one time fact and the main button)
+ * or expanded details (all facts, raw ids, attach command, restart and duplicate archiving). Host-scoped like
+ * `herdr-overview-view`, so every device that opens this host shares one choice.
+ */
+export const herdrDensitySettings = defineSettings({
+  id: "herdr-overview-density",
+  scope: "host",
+  version: 1,
+  schema: z.object({
+    expanded: z.boolean().default(false),
+  }),
+});

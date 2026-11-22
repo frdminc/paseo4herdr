@@ -57,15 +57,19 @@ describe("sort details", () => {
 
 describe("place line", () => {
   it("uses the names a Herdr user knows, with no W/T/P codes, and shows a pane only when it is needed", () => {
-    const lone = rowTexts(item({ cwd: "/very/long/absolute/path/to/the/project" }), "x", NOW, { compact: false, grouped: false });
-    expect(lone.place).toBe("proj › one · …/the/project");
-    expect(lone.pin).toBe(""); // the only pane in its tab: nothing to tell apart
+    const withLongPath = item({ cwd: "/very/long/absolute/path/to/the/project" });
+    const loneExpanded = rowTexts(withLongPath, "x", NOW, { compact: false, grouped: false, expanded: true });
+    expect(loneExpanded.place).toBe("proj › one · …/the/project");
+    expect(loneExpanded.pin).toBe(""); // the only pane in its tab: nothing to tell apart
+    const loneCompact = rowTexts(withLongPath, "x", NOW, { compact: false, grouped: false });
+    expect(loneCompact.place).toBe("proj › one"); // compact keeps Herdr names only, no folder path
+    expect(loneCompact.pin).toBe("");
     const shared = { ...item(), tabPanes: 2 };
     const row = rowTexts(shared, "x", NOW, { compact: false, grouped: false });
     expect(row.pin).toBe("pane 1");
     expect(row.place).not.toContain("pane");
     expect(rowTexts({ ...shared, agent: { ...shared.agent, paneNumber: null } }, "x", NOW, { compact: true, grouped: true }).pin).toBe("");
-    for (const text of [row.place, row.pin, row.speech, lone.place]) expect(text).not.toMatch(/\b[WTP]\d/);
+    for (const text of [row.place, row.pin, row.speech, loneExpanded.place, loneCompact.place]) expect(text).not.toMatch(/\b[WTP]\d/);
   });
   it("a pane the Herdr user named shows that name, even alone in its tab", () => {
     expect(rowTexts(item({ paneLabel: "logs" }), "x", NOW, { compact: false, grouped: true }).pin).toBe("logs");
@@ -134,5 +138,84 @@ describe("tick interval", () => {
   });
   it("the default sort direction chip does not repeat the field name", () => {
     expect(dirLabel("herdr", "asc")).toBe("Pane order");
+  });
+});
+
+describe("compact vs expanded row view", () => {
+  const rich = () => item({
+    status: "idle",
+    cwd: "/work/other/repo",
+    lastActivityAt: new Date(NOW - 3 * 60_000).toISOString(),
+    stateChangedAt: new Date(NOW - 12 * 60_000).toISOString(),
+    stateChangedExact: true,
+    sessionStartedAt: new Date(NOW - 2 * 3600_000).toISOString(),
+    model: "anthropic/claude-sonnet",
+    cache: cache(120), // 3m left (warm, not alerting)
+  });
+
+  it("compact (default) shows names and one time fact, omitting model, folder path and extra times", () => {
+    const compactDefault = rowTexts(rich(), "Fix tests", NOW, { compact: false, grouped: true });
+    const compactExplicit = rowTexts(rich(), "Fix tests", NOW, { compact: false, grouped: true, expanded: false });
+    expect(compactDefault).toEqual(compactExplicit);
+    expect(compactDefault.place).toBe("one");
+    expect(compactDefault.times).toBe("active 3m ago");
+    expect(compactDefault.times).not.toContain("·");
+    expect(compactDefault.times).not.toContain("anthropic");
+    expect(compactDefault.alert).toBe(false);
+  });
+
+  it("expanded shows all inline facts, model and folder path", () => {
+    const expanded = rowTexts(rich(), "Fix tests", NOW, { compact: false, grouped: true, expanded: true });
+    expect(expanded.place).toBe("one · …/other/repo");
+    expect(expanded.times).toContain("active 3m ago");
+    expect(expanded.times).toContain("idle 12m");
+    expect(expanded.times).toContain("cache cold in 3m (est.)");
+    expect(expanded.times).toContain("started 2h ago");
+    expect(expanded.times).toContain("anthropic/claude-sonnet");
+  });
+
+  it("compact prioritizes a blocked cooling cache alert so warning tone matches the shown fact", () => {
+    const alerting = item({
+      status: "blocked",
+      lastActivityAt: new Date(NOW - 4 * 60_000).toISOString(),
+      stateChangedAt: new Date(NOW - 5 * 60_000).toISOString(),
+      cache: cache(255), // 45s left -> cooling
+    });
+    const wide = rowTexts(alerting, "Approve", NOW, { compact: false, grouped: true, expanded: false });
+    expect(wide.alert).toBe(true);
+    expect(wide.times).toBe("cache cold in 45s ⚠ (est.)");
+    const narrow = rowTexts(alerting, "Approve", NOW, { compact: true, grouped: true, expanded: false });
+    expect(narrow.alert).toBe(true);
+    expect(narrow.times).toBe("cache 45s⚠ est.");
+    expect(narrow.place).toBe("Blocked · one"); // phone compact drops state duration from place
+  });
+
+  it("compact falls back to state duration, then session start, then cache, then empty", () => {
+    const stateOnly = item({
+      status: "working",
+      stateChangedAt: new Date(NOW - 7 * 60_000).toISOString(),
+      stateChangedExact: true,
+      sessionStartedAt: new Date(NOW - 3600_000).toISOString(),
+    });
+    expect(rowTexts(stateOnly, "x", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("working 7m");
+
+    const startOnly = item({ status: "idle", sessionStartedAt: new Date(NOW - 3600_000).toISOString() });
+    expect(rowTexts(startOnly, "x", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("started 1h ago");
+    expect(rowTexts(startOnly, "x", NOW, { compact: true, grouped: true, expanded: false }).times).toBe("started 1h");
+
+    const cacheOnly = item({ status: "idle", cache: cache(120) });
+    expect(rowTexts(cacheOnly, "x", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("cache cold in 3m (est.)");
+
+    expect(rowTexts(plain(), "zsh", NOW, { compact: false, grouped: true, expanded: false }).times).toBe("");
+  });
+
+  it("phone compact omits state duration from place, while phone expanded keeps it and both active + cache", () => {
+    const compactPhone = rowTexts(rich(), "Fix tests", NOW, { compact: true, grouped: true, expanded: false });
+    expect(compactPhone.place).toBe("Idle · one");
+    expect(compactPhone.times).toBe("active 3m");
+
+    const expandedPhone = rowTexts(rich(), "Fix tests", NOW, { compact: true, grouped: true, expanded: true });
+    expect(expandedPhone.place).toBe("Idle 12m · one");
+    expect(expandedPhone.times).toBe("active 3m · cache 3m est.");
   });
 });
