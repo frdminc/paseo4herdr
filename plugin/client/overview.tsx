@@ -19,6 +19,7 @@ import {
   archiveFailureMessage,
   companionBanner,
   DEFAULT_EXPANDED,
+  densityToggleA11y,
   describeTarget,
   duplicateArchiveSkippedMessage,
   duplicateChatsToArchive,
@@ -937,9 +938,7 @@ function SortBar({ view, onChange, expanded, onToggleExpanded, compact, styles }
         <Text style={styles.text}>{view.grouped ? "Grouped" : "Flat"}</Text>
       </Pressable>
       <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        accessibilityLabel={expanded ? "Expanded view. Tap for compact view" : "Compact view. Tap for expanded view"}
+        {...densityToggleA11y(expanded)}
         onPress={onToggleExpanded}
         style={expanded ? styles.chipOn : styles.chip}
       >

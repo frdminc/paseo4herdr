@@ -254,6 +254,23 @@ export function normalizeExpanded(raw: { expanded?: unknown } | null | undefined
   return typeof raw?.expanded === "boolean" ? raw.expanded : DEFAULT_EXPANDED;
 }
 
+/**
+ * Accessibility props for the screen-level Compact/Expanded toggle. Uses `aria-expanded` rather than
+ * `accessibilityState`: react-native-web renders `aria-expanded` directly (it ignores `accessibilityState`),
+ * and native React Native maps `aria-expanded` onto `accessibilityState.expanded`.
+ */
+export function densityToggleA11y(expanded: boolean): {
+  accessibilityRole: "button";
+  "aria-expanded": boolean;
+  accessibilityLabel: string;
+} {
+  return {
+    accessibilityRole: "button",
+    "aria-expanded": expanded,
+    accessibilityLabel: expanded ? "Expanded view. Tap for compact view" : "Compact view. Tap for expanded view",
+  };
+}
+
 /** Which single action button compact view shows for a row, or null when none applies. */
 export type PrimaryRowAction = "openAgent" | "openTerminal" | "newAgentHere" | null;
 

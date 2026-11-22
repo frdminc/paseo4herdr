@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { herdrDensitySettings, shellGateEpoch } from "../shared/settings.js";
-import { withShellSwitch, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, DEFAULT_EXPANDED, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, normalizeExpanded, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, primaryRowAction, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
+import { withShellSwitch, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, DEFAULT_EXPANDED, densityToggleA11y, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, normalizeExpanded, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, primaryRowAction, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
 
 describe("withShellSwitch", () => {
   const base = { herdrSession: "s", allowShell: false, allowShellEpoch: 0 };
@@ -305,5 +305,23 @@ describe("compact/expanded view helpers and setting", () => {
     expect(herdrDensitySettings.schema.parse({})).toEqual({ expanded: false });
     expect(herdrDensitySettings.schema.parse({ expanded: true })).toEqual({ expanded: true });
     expect(() => herdrDensitySettings.schema.parse({ expanded: "true" })).toThrow();
+  });
+
+  it("exposes Compact/Expanded toggle state via aria-expanded (web + native) without leaking accessibilityState", () => {
+    const compactProps = densityToggleA11y(false);
+    expect(compactProps).toEqual({
+      accessibilityRole: "button",
+      "aria-expanded": false,
+      accessibilityLabel: "Compact view. Tap for expanded view",
+    });
+    expect("accessibilityState" in compactProps).toBe(false);
+
+    const expandedProps = densityToggleA11y(true);
+    expect(expandedProps).toEqual({
+      accessibilityRole: "button",
+      "aria-expanded": true,
+      accessibilityLabel: "Expanded view. Tap for compact view",
+    });
+    expect("accessibilityState" in expandedProps).toBe(false);
   });
 });
