@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { herdrDensitySettings, shellGateEpoch } from "../shared/settings.js";
-import { withShellSwitch, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, DEFAULT_EXPANDED, densityToggleA11y, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, normalizeExpanded, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, primaryRowAction, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
+import { withShellSwitch, agentSpeech, archiveDuplicatesLabel, archiveFailureMessage, companionBanner, DEFAULT_EXPANDED, densityToggleA11y, duplicateArchiveSkippedMessage, duplicateChatsToArchive, freshDuplicatesToArchive, folderFieldValue, needsHomeExpansion, normalizeExpanded, agentLabel, describeTarget, NOTICE_TOAST_MS, DEFAULT_TOAST_MS, PICKER_LIMIT, pickerItems, pickerPlace, primaryRowAction, rowActions, paneText, pathTail, placeText, plainState, plainRowTitle, plainPaneBindable, statusLabel, statusTone, tabText, validateFolder, workspaceText } from "../client/helpers.js";
 
 describe("withShellSwitch", () => {
   const base = { herdrSession: "s", allowShell: false, allowShellEpoch: 0 };
@@ -307,12 +307,12 @@ describe("compact/expanded view helpers and setting", () => {
     expect(() => herdrDensitySettings.schema.parse({ expanded: "true" })).toThrow();
   });
 
-  it("exposes Compact/Expanded toggle state via aria-expanded (web + native) without leaking accessibilityState", () => {
+  it("exposes Compact/Expanded toggle state via aria-expanded (web + native) with a stable label and no accessibilityState", () => {
     const compactProps = densityToggleA11y(false);
     expect(compactProps).toEqual({
       accessibilityRole: "button",
       "aria-expanded": false,
-      accessibilityLabel: "Compact view. Tap for expanded view",
+      accessibilityLabel: "Expanded rows",
     });
     expect("accessibilityState" in compactProps).toBe(false);
 
@@ -320,8 +320,16 @@ describe("compact/expanded view helpers and setting", () => {
     expect(expandedProps).toEqual({
       accessibilityRole: "button",
       "aria-expanded": true,
-      accessibilityLabel: "Expanded view. Tap for compact view",
+      accessibilityLabel: "Expanded rows",
     });
     expect("accessibilityState" in expandedProps).toBe(false);
+  });
+
+  it("announces read-only input state in agentSpeech only when inputReady is false", () => {
+    const hidden = { kind: "hidden" } as const;
+    const now = Date.parse("2026-11-28T12:00:00Z");
+    expect(agentSpeech(flat({ inputReady: false }), "Old OMP", hidden, now)).toContain("read-only, input unavailable");
+    expect(agentSpeech(flat({ inputReady: true }), "Live OMP", hidden, now)).not.toContain("read-only");
+    expect(agentSpeech(flat({ inputReady: null }), "Shell", hidden, now)).not.toContain("read-only");
   });
 });

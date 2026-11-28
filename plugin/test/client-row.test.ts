@@ -188,6 +188,32 @@ describe("compact vs expanded row view", () => {
     expect(narrow.alert).toBe(true);
     expect(narrow.times).toBe("cache 45s⚠ est.");
     expect(narrow.place).toBe("Blocked · one"); // phone compact drops state duration from place
+
+    // Without lastActivityAt, the inlineStateDur guard must still keep the cache alert in times (not state duration in head).
+    const alertingNoActivity = item({
+      status: "blocked",
+      stateChangedAt: new Date(NOW - 5 * 60_000).toISOString(),
+      stateChangedExact: true,
+      cache: cache(255),
+    });
+    const narrowAlertOnly = rowTexts(alertingNoActivity, "Approve", NOW, { compact: true, grouped: true, expanded: false });
+    expect(narrowAlertOnly.place).toBe("Blocked · one");
+    expect(narrowAlertOnly.times).toBe("cache 45s⚠ est.");
+    expect(narrowAlertOnly.alert).toBe(true);
+
+    // When read-only is also true on a blocked cooling-cache phone row (no lastActivityAt), read-only wins and is spoken.
+    const roAlertingNoActivity = item({
+      status: "blocked",
+      inputReady: false,
+      stateChangedAt: new Date(NOW - 5 * 60_000).toISOString(),
+      stateChangedExact: true,
+      cache: cache(255),
+    });
+    const narrowRoAlert = rowTexts(roAlertingNoActivity, "Approve", NOW, { compact: true, grouped: true, expanded: false });
+    expect(narrowRoAlert.place).toBe("Blocked · one");
+    expect(narrowRoAlert.times).toBe("read-only");
+    expect(narrowRoAlert.alert).toBe(true);
+    expect(narrowRoAlert.speech).toContain("read-only, input unavailable");
   });
 
   it("compact shows a short warning-tone read-only marker when input is unavailable", () => {
@@ -201,15 +227,18 @@ describe("compact vs expanded row view", () => {
     const wide = rowTexts(ro, "Old OMP", NOW, { compact: false, grouped: true, expanded: false });
     expect(wide.times).toBe("read-only");
     expect(wide.alert).toBe(true);
+    expect(wide.speech).toContain("read-only, input unavailable");
     const narrow = rowTexts(ro, "Old OMP", NOW, { compact: true, grouped: true, expanded: false });
     expect(narrow.place).toBe("Idle · one");
     expect(narrow.times).toBe("read-only");
     expect(narrow.alert).toBe(true);
+    expect(narrow.speech).toContain("read-only, input unavailable");
     // Expanded shows the full Read-only notice separately, so times keeps normal facts and alert reflects cache only.
     const expanded = rowTexts(ro, "Old OMP", NOW, { compact: false, grouped: true, expanded: true });
     expect(expanded.times).toContain("active 3m ago");
     expect(expanded.times).not.toContain("read-only");
     expect(expanded.alert).toBe(false);
+    expect(expanded.speech).toContain("read-only, input unavailable");
   });
 
   it("compact falls back to state duration, then session start, then cache, then empty, without repeating status on phones", () => {

@@ -106,6 +106,7 @@ export function agentSpeech(item: FlatAgent, label: string, cache: CacheState, n
     : [statusLabel(agent.status).toLowerCase(), stateDurationSpeech(agent.stateChangedAt, agent.stateChangedExact, nowMs)].filter(Boolean).join(" ");
   const parts = [label, state];
   if (agent.harness) parts.push(agent.harness);
+  if (agent.inputReady === false) parts.push("read-only, input unavailable");
   const tab = tabText(item.tab);
   const pane = paneText(agent, item.tabPanes);
   parts.push(`workspace ${workspaceText(item.workspace)}`, tab.startsWith("tab ") ? tab : `tab ${tab}`);
@@ -256,8 +257,9 @@ export function normalizeExpanded(raw: { expanded?: unknown } | null | undefined
 
 /**
  * Accessibility props for the screen-level Compact/Expanded toggle. Uses `aria-expanded` rather than
- * `accessibilityState`: react-native-web renders `aria-expanded` directly (it ignores `accessibilityState`),
- * and native React Native maps `aria-expanded` onto `accessibilityState.expanded`.
+ * `accessibilityState` (react-native-web renders `aria-expanded` directly and ignores `accessibilityState`;
+ * native React Native maps `aria-expanded` onto `accessibilityState.expanded`) with a stable accessible name
+ * so screen readers announce the toggle name plus its expanded/collapsed state without repeating state text.
  */
 export function densityToggleA11y(expanded: boolean): {
   accessibilityRole: "button";
@@ -267,7 +269,7 @@ export function densityToggleA11y(expanded: boolean): {
   return {
     accessibilityRole: "button",
     "aria-expanded": expanded,
-    accessibilityLabel: expanded ? "Expanded view. Tap for compact view" : "Compact view. Tap for expanded view",
+    accessibilityLabel: "Expanded rows",
   };
 }
 
